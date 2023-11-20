@@ -38,7 +38,7 @@ jobs:
 
       - name: Clean build directory
         run: |
-          mkdir -p addons/counterstrikesharp/plugins/${{PLUGIN_NAME}}
+          mkdir -p addons/counterstrikesharp/plugins/${{env.PLUGIN_NAME}}
           mv BasicAdmin/bin/Debug/net7.0/publish/* addons/counterstrikesharp/plugins/${{PLUGIN_NAME}}
           cd addons/counterstrikesharp/plugins/${{PLUGIN_NAME}}
           rm CounterStrikeSharp.API.dll McMaster.NETCore.Plugins.dll Microsoft.DotNet.PlatformAbstractions.dll Microsoft.Extensions.DependencyModel.dll ${{PLUGIN_NAME}}.pdb
