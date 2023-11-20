@@ -2,10 +2,14 @@
     An admin for <a href="https://docs.cssharp.dev" target="_blank">CSSharp</a>
 </p>
 
-### Requirements
+## Requirements
 * CSSharp >= v61
 
-### Available commands
+## Configuration
+* **admin_tag**: Tag that's shown in the chat.
+* **hide_activity**: Hide admin activity from chat.
+
+## Available commands
 * `css_map`
   * requires `@css/changemap` flag
 * `css_kick`
@@ -39,4 +43,11 @@
   * requires `@css/slay` flag
 * `css_cvar`
   * requires `@css/cvar` flag
-  * `sv_cheats` reqyutes
+  * changing `sv_cheats` requires `@css/cheats` flag
+
+
+## To-do
+* Voting
+* Respawn
+* Logging
+
