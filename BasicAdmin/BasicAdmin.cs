@@ -296,11 +296,8 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             info.ReplyToCommand(FormatMessage($"Target {info.GetArg(1)} not found."));
             return;
         }
-
-        foreach (var weapon in player!.Pawn.Value.WeaponServices!.MyWeapons)
-        {
-            weapon.Value.Remove();
-        }
+        
+        player!.RemoveWeapons();
         
         if (!Config.HideActivity)
             Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} disarmed {player!.PlayerName}."));
