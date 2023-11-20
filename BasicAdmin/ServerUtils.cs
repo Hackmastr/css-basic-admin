@@ -27,9 +27,9 @@ internal static class ServerUtils
         return player?.IsValid == true;
     }
     
-    public static void KickPlayer(string playerName, string? reason = null)
+    public static void KickPlayer(int? userId, string? reason = null)
     {
-        Server.ExecuteCommand($"kick {playerName} {reason}");
+        Server.ExecuteCommand($"kickid {userId} {reason}");
     }
 
     public static void PrintToCenterAll(string message)
