@@ -1,23 +1,13 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using CounterStrikeSharp.API;
+﻿using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Utils;
-using System.Text.Json.Serialization;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
-using CounterStrikeSharp.API.Modules.Entities;
 using CounterStrikeSharp.API.Modules.Memory;
 
 namespace BasicAdmin;
-
-internal struct OriginalVec
-{
-    internal Vector Position;
-    internal QAngle Rotation;
-    internal Vector Velocity;
-}
 
 public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 {
@@ -27,9 +17,6 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     
     public BasicAdminConfig Config {get; set;} = new ();
     
-    private static readonly Dictionary<CCSPlayerController, OriginalVec> OriginalPositions = new ();   
-    
-
     public void OnConfigParsed(BasicAdminConfig config)
     {
         this.Config = config;
@@ -76,7 +63,7 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         ServerUtils.KickPlayer(player!.UserId, reason);
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} kicked {player!.PlayerName}."));
+            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} kicked {player.PlayerName}."));
     }
     
     [ConsoleCommand("css_slay", "Slay a player.")]
@@ -93,7 +80,7 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         player!.Pawn.Value.CommitSuicide(false, true);
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} slayed {player!.PlayerName}."));
+            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} slayed {player.PlayerName}."));
     }
     
     [ConsoleCommand("css_give", "Give a player an item.")]
@@ -110,7 +97,7 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         player!.GiveNamedItem(info.GetArg(2));
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} gave {player!.PlayerName} {ChatColors.Lime}{info.GetArg(2)}{ChatColors.Default}."));
+            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} gave {player.PlayerName} {ChatColors.Lime}{info.GetArg(2)}{ChatColors.Default}."));
     }
     
     [ConsoleCommand("css_swap", "Swap a player.")]
@@ -130,12 +117,12 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             return;
         }
      
-        var isCs = player!.TeamNum == (int) CsTeam.CounterTerrorist;
+        var isCs = player.TeamNum == (int) CsTeam.CounterTerrorist;
         
-        player!.ChangeTeam(isCs ? CsTeam.Terrorist : CsTeam.CounterTerrorist);
+        player.ChangeTeam(isCs ? CsTeam.Terrorist : CsTeam.CounterTerrorist);
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} swapped {player!.PlayerName}."));
+            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} swapped {player.PlayerName}."));
     }
     
     [ConsoleCommand("css_spec", "Change a player to spec.")]
@@ -152,7 +139,7 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         player!.ChangeTeam(CsTeam.Spectator);
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} moved {player!.PlayerName} to spec."));
+            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} moved {player.PlayerName} to spec."));
     }
     
     // [ConsoleCommand("css_respawn", "Respawn a dead player.")]
@@ -195,7 +182,7 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         var message = info.GetCommandString[range..];
         
         info.ReplyToCommand(FormatAdminMessage($"({player!.PlayerName}) {message}"));
-        player!.PrintToChat(FormatAdminMessage($"({caller!.PlayerName}) {message}"));
+        player.PrintToChat(FormatAdminMessage($"({caller!.PlayerName}) {message}"));
     }
     
     [ConsoleCommand("css_csay", "Say to all players (in center).")]
@@ -257,13 +244,13 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             return;
         }
 
-        var newPos = new Vector(player!.Pawn.Value.AbsOrigin!.X, player!.Pawn.Value.AbsOrigin!.Y,
-            player!.Pawn.Value.AbsOrigin!.Z - 10f);
+        var newPos = new Vector(player.Pawn.Value.AbsOrigin!.X, player.Pawn.Value.AbsOrigin.Y,
+            player.Pawn.Value.AbsOrigin.Z - 10f);
         
-        player!.Pawn.Value.Teleport(newPos, player!.AbsRotation!, player!.AbsVelocity);
+        player.Pawn.Value.Teleport(newPos, player.AbsRotation!, player.AbsVelocity);
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} buried {player!.PlayerName}."));
+            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} buried {player.PlayerName}."));
     }
     
     [ConsoleCommand("css_unbury", "Unbury a player.")]
@@ -277,13 +264,13 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             return;
         }
 
-        var newPos = new Vector(player!.Pawn.Value.AbsOrigin!.X, player!.Pawn.Value.AbsOrigin!.Y,
-            player!.Pawn.Value.AbsOrigin!.Z + 15f);
+        var newPos = new Vector(player!.Pawn.Value.AbsOrigin!.X, player.Pawn.Value.AbsOrigin.Y,
+            player.Pawn.Value.AbsOrigin!.Z + 15f);
         
-        player!.Pawn.Value.Teleport(newPos, player!.AbsRotation!, player!.AbsVelocity);
+        player.Pawn.Value.Teleport(newPos, player.AbsRotation!, player.AbsVelocity);
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} unburied {player!.PlayerName}."));
+            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} unburied {player.PlayerName}."));
     }
     
     [ConsoleCommand("css_disarm", "Disarm a player.")]
@@ -300,7 +287,7 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         player!.RemoveWeapons();
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} disarmed {player!.PlayerName}."));
+            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} disarmed {player.PlayerName}."));
     }
     
     [ConsoleCommand("css_hp", "Change a player's HP.")]
@@ -317,7 +304,7 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         player!.Pawn.Value.Health = health;
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} changed {player!.PlayerName}'s health to {health}."));
+            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} changed {player.PlayerName}'s health to {health}."));
     }
     
     [ConsoleCommand("css_cvar", "Change a cvar.")]
@@ -333,7 +320,7 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             return;
         }
 
-        if (cvar.Name.Equals("sv_cheats") && !AdminManager.PlayerHasPermissions(caller, "@css/cvar"))
+        if (cvar.Name.Equals("sv_cheats") && !AdminManager.PlayerHasPermissions(caller, "@css/cheats"))
         {
             info.ReplyToCommand(FormatMessage($"You don't have permissions to change \"{info.GetArg(1)}\"."));
             return;
