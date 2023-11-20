@@ -39,13 +39,13 @@ jobs:
       - name: Clean build directory
         run: |
           mkdir -p addons/counterstrikesharp/plugins/${{env.PLUGIN_NAME}}
-          mv BasicAdmin/bin/Debug/net7.0/publish/* addons/counterstrikesharp/plugins/${{PLUGIN_NAME}}
-          cd addons/counterstrikesharp/plugins/${{PLUGIN_NAME}}
-          rm CounterStrikeSharp.API.dll McMaster.NETCore.Plugins.dll Microsoft.DotNet.PlatformAbstractions.dll Microsoft.Extensions.DependencyModel.dll ${{PLUGIN_NAME}}.pdb
+          mv BasicAdmin/bin/Debug/net7.0/publish/* addons/counterstrikesharp/plugins/${{env.PLUGIN_NAME}}
+          cd addons/counterstrikesharp/plugins/${{env.PLUGIN_NAME}}
+          rm CounterStrikeSharp.API.dll McMaster.NETCore.Plugins.dll Microsoft.DotNet.PlatformAbstractions.dll Microsoft.Extensions.DependencyModel.dll ${{env.PLUGIN_NAME}}.pdb
 
       - uses: actions/upload-artifact@v3
         with:
-          name: css-${{PLUGIN_NAME}}-${{ env.GITHUB_SHA_SHORT }}
+          name: css-${{env.PLUGIN_NAME}}-${{ env.GITHUB_SHA_SHORT }}
           path: addons
 
       - name: Generate build number
@@ -66,18 +66,18 @@ jobs:
 
       - uses: actions/download-artifact@v3
         with:
-          name: css-${{PLUGIN_NAME}}-${{ env.GITHUB_SHA_SHORT }}
+          name: css-${{env.PLUGIN_NAME}}-${{ env.GITHUB_SHA_SHORT }}
           path: addons
 
       - name: Prepare zip
         run: |
-          zip -qq -r css-${{PLUGIN_NAME}}-${{ env.GITHUB_SHA_SHORT }}.zip *
+          zip -qq -r css-${{env.PLUGIN_NAME}}-${{ env.GITHUB_SHA_SHORT }}.zip *
 
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ needs.build.outputs.buildnumber }}
           files: |
-            css-${{PLUGIN_NAME}}-${{ env.GITHUB_SHA_SHORT }}.zip
+            css-${{env.PLUGIN_NAME}}-${{ env.GITHUB_SHA_SHORT }}.zip
           body: |
             ${{ github.event.head_commit.message }}
