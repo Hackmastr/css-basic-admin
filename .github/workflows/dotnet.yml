@@ -10,7 +10,7 @@ on:
     branches: [ "main" ]
 
 env:
-  PLUGIN_NAME: PluginName
+  PLUGIN_NAME: BasicAdmin
 
 jobs:
   build:
