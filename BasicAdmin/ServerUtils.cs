@@ -1,11 +1,30 @@
 ﻿using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Admin;
+using CounterStrikeSharp.API.Modules.Utils;
 
 namespace BasicAdmin;
 
 
 internal static class ServerUtils
 {
+    private static readonly Dictionary<TargetFilter, Predicate<CCSPlayerController>> FilterPredicates = new()
+    {
+        { TargetFilter.CounterTerrorist, player => player.TeamNum == (int)CsTeam.CounterTerrorist },
+        { TargetFilter.Terrorist, player => player.TeamNum == (int)CsTeam.Terrorist },
+        { TargetFilter.Alive, player => player.TeamNum == (int)LifeState_t.LIFE_ALIVE },
+        { TargetFilter.Admin, player => AdminManager.PlayerHasPermissions(player, "@css/chat") },
+        { TargetFilter.Dead, player => player.LifeState == (int)LifeState_t.LIFE_DEAD },
+        { TargetFilter.Spec, player => player.TeamNum == (int)CsTeam.Spectator },
+    };
+    
+    private static readonly Dictionary<int, TargetFilter> TeamTargetFilter = new()
+    {
+        {(int) CsTeam.CounterTerrorist, TargetFilter.CounterTerrorist},
+        {(int) CsTeam.Terrorist, TargetFilter.Terrorist},
+        {(int) CsTeam.Spectator, TargetFilter.Spec},
+    };
+    
     public static List<CCSPlayerController> GetPlayerFromName(string name)
     {
         return Utilities.GetPlayers().FindAll(x => x.PlayerName.Contains(name, StringComparison.OrdinalIgnoreCase));
@@ -43,11 +62,20 @@ internal static class ServerUtils
             controller.PrintToCenter(message);
         });
     }
-}
 
-internal enum TargetResult
-{
-    None,
-    Multiple,
-    Single
+    public static void PrintToChatTeam(int team, string message)
+    {
+        Utilities.GetPlayers().FindAll(FilterPredicates[TeamTargetFilter[team]]).ForEach(controller =>
+        {
+            controller.PrintToChat(message);
+        });
+    }
+
+    public static void PrintToChatTeam(TargetFilter filter, string message)
+    {
+        Utilities.GetPlayers().FindAll(FilterPredicates[filter]).ForEach(controller =>
+        {
+            controller.PrintToChat(message);
+        });
+    }
 }

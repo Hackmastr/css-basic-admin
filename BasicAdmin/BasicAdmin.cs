@@ -9,6 +9,7 @@ using CounterStrikeSharp.API.Modules.Memory;
 
 namespace BasicAdmin;
 
+// [MinimumApiVersion(66)]
 public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 {
     public override string ModuleName => "BasicAdmin";
@@ -23,7 +24,48 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     }
 
     public override void Load(bool hotReload)
-    { }
+    {
+        base.Load(hotReload);
+        
+        AddCommandListener("say", OnSayCommand);
+        AddCommandListener("say_team", OnSayCommand);
+    }
+
+    // public override void Unload(bool hotReload)
+    // {
+    //     base.Unload(hotReload);
+    //     
+    //     RemoveCommandListener("say", OnSayCommand, HookMode.Pre);
+    //     RemoveCommandListener("say_team", OnSayCommand, HookMode.Pre);
+    // }
+
+    public HookResult OnSayCommand(CCSPlayerController? caller, CommandInfo info)
+    {
+        if (!(info.GetArg(1).StartsWith('@') && AdminManager.PlayerHasPermissions(caller, "@css/chat")))
+            return HookResult.Continue;
+
+        var isTeam = info.GetArg(0).Equals("say_team");
+        var start = isTeam ? 11 : 6;
+        string message;
+
+        if (isTeam)
+        {
+            message = string.Format(Config.AdminSayTextTeam, caller!.PlayerName,
+                info.GetCommandString[start..^1]);
+        }
+        else
+        {
+            message = FormatAdminMessage(string.Format(Config.AdminSayText, caller!.PlayerName,
+                info.GetCommandString[start..^1]));
+        }
+        
+        if (isTeam)
+            ServerUtils.PrintToChatTeam(TargetFilter.Admin, message);
+        else
+            Server.PrintToChatAll(message);
+        
+        return HookResult.Stop;
+    }
     
     [ConsoleCommand("css_map", "Change map.")]
     [CommandHelper(1, "<mapname>")]
@@ -104,7 +146,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/cvar")]
     public void OnGiveCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player)) 
+        if (!GetTarget(info, out var player))
             return;
 
         var range = info.GetArg(0).Length + info.GetArg(1).Length + 2;

@@ -26,6 +26,8 @@
 * `css_spec`
   * requires `@css/kick` flag
 * `css_say`
+* `@` (alias)
+* `@` (in team chat, admins only)
   * requires `@css/chat` flag
 * `css_psay`
   * requires `@css/chat` flag

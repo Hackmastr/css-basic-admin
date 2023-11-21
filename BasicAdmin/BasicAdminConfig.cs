@@ -1,5 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Utils;
 
 namespace BasicAdmin;
 
@@ -10,4 +11,10 @@ public class BasicAdminConfig : BasePluginConfig
     
     [JsonPropertyName("hide_activity")]
     public bool HideActivity { get; set; } = false;
+    
+    [JsonPropertyName("admin_say_text")]
+    public string AdminSayText { get; set; } = $"\x03{{0}}\x01: {{1}}";
+    
+    [JsonPropertyName("admin_say_text_admins")]
+    public string AdminSayTextTeam { get; set; } = $"(Admins only) \x03{{0}}\x01: {{1}}";
 }
