@@ -12,6 +12,9 @@
 ## Available commands
 * `css_map`
   * requires `@css/changemap` flag
+* `css_workshop`
+* `css_wsmap` (alias)
+  * requires `@css/changemap` flag
 * `css_kick`
   * requires `@css/kick` flag
 * `css_slay`

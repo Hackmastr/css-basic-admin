@@ -9,7 +9,7 @@ using CounterStrikeSharp.API.Modules.Memory;
 
 namespace BasicAdmin;
 
-public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
+public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 {
     public override string ModuleName => "BasicAdmin";
     public override string ModuleAuthor => "livevilog";
@@ -44,6 +44,28 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             Server.ExecuteCommand($"changelevel {map}");
             // caller.Discon
+        });
+    }
+    
+    [ConsoleCommand("css_wsmap", "Change map.")]
+    [ConsoleCommand("css_workshop", "Change map.")]
+    [CommandHelper(1, "<mapid>")]
+    [RequiresPermissions("@css/changemap")]
+    public void OnWorkshopMapCommand(CCSPlayerController? caller, CommandInfo info)
+    {
+        var map = info.GetArg(1);
+        
+        if (!Server.IsMapValid(map))
+        {
+            info.ReplyToCommand(FormatMessage($"Map {map} not found."));
+            return;
+        }
+        
+        Server.PrintToChatAll(FormatAdminMessage($"Changing map to {map}..."));
+        
+        AddTimer(3f, () =>
+        {
+            Server.ExecuteCommand($"ds_workshop_changelevel {map}");
         });
     }
     
@@ -204,7 +226,7 @@ public class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             0, 0, 0, 0);
     }
     
-    [ConsoleCommand("css_extend", "Respawn a dead player.")]
+    [ConsoleCommand("css_extend", "Extend map timelimit.")]
     [CommandHelper(1, "<minutes>")]
     [RequiresPermissions("@css/changemap")]
     public void OnExtendCommand(CCSPlayerController? caller, CommandInfo info)
