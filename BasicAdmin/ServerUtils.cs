@@ -6,12 +6,12 @@ namespace BasicAdmin;
 
 internal static class ServerUtils
 {
-    public static CCSPlayerController? GetPlayerFromName(string name)
+    public static List<CCSPlayerController> GetPlayerFromName(string name)
     {
-        return Utilities.GetPlayers().FirstOrDefault(x => x.PlayerName.Equals(name));
+        return Utilities.GetPlayers().FindAll(x => x.PlayerName.Contains(name, StringComparison.OrdinalIgnoreCase));
     }
     
-    public static bool GetTarget(string target, out CCSPlayerController? player)
+    public static TargetResult GetTarget(string target, out CCSPlayerController? player)
     {
         player = null;
         
@@ -21,10 +21,14 @@ internal static class ServerUtils
         }
         else
         {
-            player = GetPlayerFromName(target);
+            var matches = GetPlayerFromName(target);
+            if (matches.Count > 1)
+                return TargetResult.Multiple;
+            
+            player = matches.FirstOrDefault();
         }
 
-        return player?.IsValid == true;
+        return player?.IsValid == true ? TargetResult.Single : TargetResult.None;
     }
     
     public static void KickPlayer(int? userId, string? reason = null)
@@ -39,4 +43,11 @@ internal static class ServerUtils
             controller.PrintToCenter(message);
         });
     }
+}
+
+internal enum TargetResult
+{
+    None,
+    Multiple,
+    Single
 }
