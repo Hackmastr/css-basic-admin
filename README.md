@@ -3,56 +3,54 @@
 </p>
 
 ## Requirements
-* CSSharp >= v61
+* CSSharp >= v65
 
 ## Configuration
 * **admin_tag**: Tag that's shown in the chat.
 * **hide_activity**: Hide admin activity from chat.
+* **admin_list_min_flag**: Required flag to be included in the list of admins.
+* **admin_list_req_flag**: If not left empty, all players can see a lit of admins.
+* **freeze_duration**: Default freeze duration when using the freeze command.
 
 ## Available commands
-* `css_map`
-  * requires `@css/changemap` flag
-* `css_workshop`
-* `css_wsmap` (alias)
-  * requires `@css/changemap` flag
-* `css_kick`
-  * requires `@css/kick` flag
-* `css_slay`
-  * requires `@css/slay` flag
-* `css_give`
-  * requires `@css/cvar` flag
-* `css_swap`
-  * requires `@css/kick` flag
-* `css_spec`
-  * requires `@css/kick` flag
-* `css_say`
-* `@` (alias)
-* `@` (in team chat, admins only)
-  * requires `@css/chat` flag
-* `css_psay`
-  * requires `@css/chat` flag
-* `css_csay`
-  * requires `@css/chat` flag
-* `css_hsay`
-  * requires `@css/chat` flag
-* `css_extend`
-  * requires `@css/changemap` flag
-* `css_restartgame`
-* `css_rr` (alias)
-  * requires `@css/changemap` flag
-* `css_bury`/`css_unbury`
-  * requires `@css/ban` flag
-* `css_disarm`
-  * requires `@css/ban` flag
-* `css_hp`
-  * requires `@css/slay` flag
-* `css_cvar`
-  * requires `@css/cvar` flag
-  * changing `sv_cheats` requires `@css/cheats` flag
+| Command                       | Flags Required                  |
+|-------------------------------|---------------------------------|
+| css_admins                    | no flags required (can be changed in config) |
+| css_admin_help                | @css/generic                    |
+| css_bury/css_unbury           | @css/ban                        |
+| css_cvar                      | @css/cvar                       |
+|                               | changing sv_cheats requires @css/cheats flag |
+|                               |                                 |
+| css_say                       |                                 |
+| @ (alias)                     |                                 |
+| @ (in team chat, admins only) |                                 |
+| css_csay                      |                                 |
+| css_hsay                      |                                 |
+| css_psay                      |                                 |
+|                               | @css/chat                       |
+|                               |                                 |
+| css_disarm                    | @css/ban           |
+| css_freeze/css_unfreeze       | @css/slay          |
+| css_extend                    | @css/changemap     |
+| css_forcespec                 | @css/kick          |
+| css_give                      | @css/cvar          |
+| css_kick                      | @css/kick          |
+| css_noclip                    | @css/cheats        |
+| css_map                       | @css/changemap     |
+| css_restartgame               |                                 |
+| css_rr (alias)                |                                 |
+|                               | @css/changemap     |
+|                               |                                 |
+| css_hp                        |           |
+| css_slay                      | @css/slay          |
+| css_slap                      | @css/kick          |
+| css_swap                      | @css/kick          |
+| css_workshop                  |                                 |
+| css_wsmap (alias)             | @css/changemap     |
+
 
 
 ## To-do
 * Voting
 * Respawn
-* Logging
 
