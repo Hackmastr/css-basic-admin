@@ -559,7 +559,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         }
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} toggled godmode on {player.PlayerName} (h: {player.Entity!.EntityInstance.Handle:X}."));
+            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} toggled godmode on {player.PlayerName}."));
     }
     
     [ConsoleCommand("css_rcon", "Run a server console command.")]
