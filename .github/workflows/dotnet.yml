@@ -17,8 +17,6 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
-    outputs:
-      buildnumber: ${{ steps.buildnumber.outputs.build_number }}
     steps:
       - name: Prepare env
         shell: bash
@@ -47,12 +45,6 @@ jobs:
         with:
           name: css-${{env.PLUGIN_NAME}}-${{ env.GITHUB_SHA_SHORT }}
           path: addons
-
-      - name: Generate build number
-        id: buildnumber
-        uses: onyxmueller/build-tag-number@v1
-        with:
-          token: ${{secrets.github_token}}
   
   publish:
     permissions:
@@ -76,7 +68,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ needs.build.outputs.buildnumber }}
+          tag_name: ${{ env.GITHUB_SHA_SHORT }}
           files: |
             css-${{env.PLUGIN_NAME}}-${{ env.GITHUB_SHA_SHORT }}.zip
           body: |
