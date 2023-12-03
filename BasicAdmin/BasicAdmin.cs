@@ -6,6 +6,7 @@ using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Utils;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Commands;
+using CSSTargetResult = CounterStrikeSharp.API.Modules.Commands.Targeting.TargetResult;
 using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
@@ -13,12 +14,12 @@ using Microsoft.Extensions.Logging;
 
 namespace BasicAdmin;
 
-[MinimumApiVersion(65)]
+[MinimumApiVersion(98)]
 public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 {
     public override string ModuleName => "BasicAdmin";
     public override string ModuleAuthor => "livevilog";
-    public override string ModuleVersion => "1.4.0";
+    public override string ModuleVersion => "1.5.0";
     
     public BasicAdminConfig Config {get; set;} = new ();
     
@@ -48,14 +49,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 
     private static HookResult OnTakeDamage(DynamicHook hook)
     {
-        var entindex = hook.GetParam<CEntityInstance>(0).EntityIndex?.Value;
+        var entindex = hook.GetParam<CEntityInstance>(0).Index;
        
-        if (entindex is null or 0)
+        if (entindex == 0)
             return HookResult.Continue;
 
-        var pawn = Utilities.GetEntityFromIndex<CCSPlayerPawn>((int)entindex.Value);
+        var pawn = Utilities.GetEntityFromIndex<CCSPlayerPawn>((int)entindex);
         
-        if (pawn.OriginalController?.Value is not { } player)
+        if (pawn.OriginalController.Value is not { } player)
             return HookResult.Continue;
         
         if (ActiveGodMode.ContainsKey(player.Handle))
@@ -94,7 +95,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         return HookResult.Stop;
     }
 
-    [GameEventHandler(HookMode.Post)]
+    [GameEventHandler]
     public HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
     {
         ActiveGodMode.Clear();
@@ -132,10 +133,9 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/changemap")]
     public void OnWorkshopMapCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        string? command = null;
         var map = info.GetArg(1);
 
-        command = ulong.TryParse(map, out var mapId) ? $"host_workshop_map {mapId}" : $"ds_workshop_changelevel {map}";
+        var command = ulong.TryParse(map, out var mapId) ? $"host_workshop_map {mapId}" : $"ds_workshop_changelevel {map}";
         
         // if (mapId == 0 && !Server.IsMapValid(map))
         // {
@@ -158,15 +158,17 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/kick")]
     public void OnKickCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player)) 
-            return;
+        var target = GetTarget(info);
         
         var reason = info.GetArg(2);
         
-        ServerUtils.KickPlayer(player!.UserId, reason);
-        
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} kicked {player.PlayerName}."));
+        target?.Players.ForEach(player =>
+        {
+            ServerUtils.KickPlayer(player.UserId, reason);
+            
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} kicked {player.PlayerName}."));
+        });
     }
 
     [ConsoleCommand("css_slay", "Slay a player.")]
@@ -174,13 +176,13 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/slay")]
     public void OnSlayCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player)) 
-            return;
-        
-        player!.Pawn.Value.CommitSuicide(false, true);
-        
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} slayed {player.PlayerName}."));
+        GetTarget(info)?.Players.ForEach(player =>
+        {
+            player.Pawn.Value?.CommitSuicide(false, true);
+            
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} slayed {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_give", "Give a player an item.")]
@@ -188,16 +190,18 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/cvar")]
     public void OnGiveCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player))
-            return;
+        var target = GetTarget(info);
 
         var range = info.GetArg(0).Length + info.GetArg(1).Length + 2;
         var item = info.GetCommandString[range..];
         
-        player!.GiveNamedItem(item);
-        
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} gave {player.PlayerName} {ChatColors.Lime}{item}{ChatColors.Default}."));
+        target?.Players.ForEach(player =>
+        {
+            player.GiveNamedItem(item);
+            
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} gave {player.PlayerName} {ChatColors.Lime}{item}{ChatColors.Default}."));
+        });
     }
     
     [ConsoleCommand("css_swap", "Swap a player.")]
@@ -205,21 +209,22 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/kick")]
     public void OnSwapCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player)) 
-            return;
-        
-        if ((int) CsTeam.Spectator == player!.TeamNum)
+        var target = GetTarget(info);
+        target?.Players.ForEach(player =>
         {
-            info.ReplyToCommand(FormatMessage($"Target {info.GetArg(1)} is a spectator."));
-            return;
-        }
+            if ((int) CsTeam.Spectator == player.TeamNum)
+            {
+                info.ReplyToCommand(FormatMessage($"Target {info.GetArg(1)} is a spectator."));
+                return;
+            }
      
-        var isCs = player.TeamNum == (int) CsTeam.CounterTerrorist;
+            var isCs = player.TeamNum == (int) CsTeam.CounterTerrorist;
         
-        player.ChangeTeam(isCs ? CsTeam.Terrorist : CsTeam.CounterTerrorist);
+            player.ChangeTeam(isCs ? CsTeam.Terrorist : CsTeam.CounterTerrorist);
         
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} swapped {player.PlayerName}."));
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} swapped {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_forcespec", "Change a player to spec.")]
@@ -227,13 +232,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/kick")]
     public void OnForceSpecCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player)) 
-            return;
+        var target = GetTarget(info);
+        target?.Players.ForEach(player =>
+        {
+            player.ChangeTeam(CsTeam.Spectator);
         
-        player!.ChangeTeam(CsTeam.Spectator);
-        
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} moved {player.PlayerName} to spec."));
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} moved {player.PlayerName} to spec."));
+        });
     }
     
     [ConsoleCommand("css_respawn", "Respawn a dead player.")]
@@ -241,16 +247,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/kick")]
     public void OnRespawnCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player))
+        var target = GetTarget(info);
+        target?.Players.ForEach(player =>
         {
-            info.ReplyToCommand(FormatMessage($"Target {info.GetArg(1)} not found."));
-            return;
-        }
+            player.Respawn();
         
-        player!.Respawn();
-        
-        if (Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} respawned {player.PlayerName}."));
+            if (Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} respawned {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_say", "Say to all players.")]
@@ -266,14 +270,16 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/chat")]
     public void OnAdminPrivateSayCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player)) 
-            return;
-
+        var target = GetTarget(info);
+        
         var range = info.GetArg(0).Length + info.GetArg(1).Length + 2;
         var message = info.GetCommandString[range..];
         
-        info.ReplyToCommand(FormatAdminMessage($"({player!.PlayerName}) {message}"));
-        player.PrintToChat(FormatAdminMessage($"({caller!.PlayerName}) {message}"));
+        target?.Players.ForEach(player =>
+        {
+            info.ReplyToCommand(FormatAdminMessage($"({player.PlayerName}) {message}"));
+            player.PrintToChat(FormatAdminMessage($"({caller!.PlayerName}) {message}"));
+        });
     }
     
     [ConsoleCommand("css_csay", "Say to all players (in center).")]
@@ -331,9 +337,8 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/ban")]
     public void OnBuryCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player)) 
-            return;
-
+        var target = GetTarget(info);
+        
         var duration = 0;
         
         if (!string.IsNullOrEmpty(info.GetArg(2)) && !int.TryParse(info.GetArg(2), out duration))
@@ -341,14 +346,17 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             info.ReplyToCommand(FormatMessage($"Invalid duration value."));
             return;
         }
-
-        player!.Pawn.Value.Bury();
-
-        if (duration > 0)
-            AddTimer(duration, () => player!.Pawn.Value.Unbury());
         
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} buried {player.PlayerName}."));
+        target?.Players.ForEach(player =>
+        {
+            player.Pawn.Value?.Bury();
+
+            if (duration > 0)
+                AddTimer(duration, () => player.Pawn.Value?.Unbury());
+        
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller?.PlayerName} buried {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_unbury", "Unbury a player.")]
@@ -356,13 +364,13 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/ban")]
     public void OnUnburyCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player)) 
-            return;
-
-        player!.Pawn.Value.Unbury();
+        GetTarget(info)?.Players.ForEach(player =>
+        {
+            player.Pawn.Value?.Unbury();
         
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} unburied {player.PlayerName}."));
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} unburied {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_disarm", "Disarm a player.")]
@@ -370,13 +378,13 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/ban")]
     public void OnDisarmCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player)) 
-            return;
-        
-        player!.RemoveWeapons();
-        
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} disarmed {player.PlayerName}."));
+        GetTarget(info)?.Players.ForEach(player =>
+        {
+            player.RemoveWeapons();
+            
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} disarmed {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_hp", "Change a player's HP.")]
@@ -384,19 +392,19 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/slay")]
     public void OnHealthCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player))
-            return;
-
         if (!int.TryParse(info.GetArg(2), out var health))
         {
             info.ReplyToCommand(FormatMessage($"Invalid health value."));
             return;
         }
 
-        player!.Pawn.Value.Health = health;
+        GetTarget(info)?.Players.ForEach(player =>
+        {
+            player.Pawn.Value!.Health = health;
         
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} changed {player.PlayerName}'s health to {health}."));
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} changed {player.PlayerName}'s health to {health}."));
+        });
     }
     
     [ConsoleCommand("css_cvar", "Change a cvar.")]
@@ -472,9 +480,6 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/slay")]
     public void OnSlapCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player))
-            return;
-
         var damage = 0;
         
         if (!string.IsNullOrEmpty(info.GetArg(2)) && !int.TryParse(info.GetArg(2), out damage))
@@ -482,11 +487,15 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             info.ReplyToCommand(FormatMessage($"Invalid damage value."));
             return;
         }
+
+        GetTarget(info)?.Players.ForEach(player =>
+        {
         
-        player!.Pawn.Value.Slap(damage);
+            player.Pawn.Value!.Slap(damage);
         
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} slapped {player.PlayerName}."));
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} slapped {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_freeze", "Freeze a player.")]
@@ -494,9 +503,6 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/slay")]
     public void OnFreezeCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player))
-            return;
-
         var duration = Config.FreezeDuration;
         
         if (!string.IsNullOrEmpty(info.GetArg(2)) && !int.TryParse(info.GetArg(2), out duration))
@@ -505,12 +511,15 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             return;
         }
         
-        player!.Pawn.Value.Freeze();
+        GetTarget(info)?.Players.ForEach(player =>
+        {
+            player.Pawn.Value!.Freeze();
         
-        AddTimer(duration, () => player.Pawn.Value.Unfreeze());
+            AddTimer(duration, () => player.Pawn.Value!.Unfreeze());
         
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} froze {player.PlayerName}."));
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} froze {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_unfreeze", "Unfreeze a player.")]
@@ -518,13 +527,13 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/slay")]
     public void OnUnfreezeCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player))
-            return;
-
-        player!.Pawn.Value.Unfreeze();
+        GetTarget(info)?.Players.ForEach(player =>
+        {
+            player.Pawn.Value!.Unfreeze();
         
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} unfroze {player.PlayerName}."));
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} unfroze {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_noclip", "Noclip a player.")]
@@ -532,13 +541,13 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/cheats")]
     public void OnNoclipCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player))
-            return;
-
-        player!.Pawn.Value.ToggleNoclip();
+        GetTarget(info)?.Players.ForEach(player =>
+        {
+            player.Pawn.Value!.ToggleNoclip();
         
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} toggled noclip on {player.PlayerName}."));
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} toggled noclip on {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_godmode", "Godmode a player.")]
@@ -546,20 +555,16 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [RequiresPermissions("@css/cheats")]
     public void OnGodmodeCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        if (!GetTarget(info, out var player))
-            return;
+        GetTarget(info)?.Players.ForEach(player =>
+        {
+            if (!ActiveGodMode.Remove(player.Handle))
+            {
+                ActiveGodMode[player.Handle] = true;
+            }
 
-        if (ActiveGodMode.ContainsKey(player!.Handle))
-        {
-            ActiveGodMode.Remove(player.Handle);
-        }
-        else
-        {
-            ActiveGodMode[player.Handle] = true;
-        }
-        
-        if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} toggled godmode on {player.PlayerName}."));
+            if (!Config.HideActivity)
+                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} toggled godmode on {player.PlayerName}."));
+        });
     }
     
     [ConsoleCommand("css_rcon", "Run a server console command.")]
@@ -574,29 +579,34 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         Logger.LogInformation($"{caller!.PlayerName} executed command ({info.ArgString}).");
     }
     
-    // [ConsoleCommand("css_vote", "Respawn a dead player.")]
-    // [CommandHelper(1, "<#userid or name>")]
-    // // [RequiresPermissions("@css/vote")]
-    // public void OnVoteCommand(CCSPlayerController? caller, CommandInfo info)
-    // {
-    
-    // }
-
-    private static bool GetTarget(CommandInfo info, out CCSPlayerController? player)
+    [ConsoleCommand("css_vote", "Start a vote.")]
+    [RequiresPermissions("@css/vote")]
+    public void OnVoteCommand(CCSPlayerController? caller, CommandInfo info)
     {
-        var matches = ServerUtils.GetTarget(info.GetArg(1), out player);
-
-        switch (matches)
+        if (info.ArgCount < 2)
         {
-            case TargetResult.None:
-                info.ReplyToCommand(FormatMessage($"Target {info.GetArg(1)} not found."));
-                return false;
-            case TargetResult.Multiple:
-                info.ReplyToCommand(FormatMessage($"Multiple targets found for \"{info.GetArg(1)}\"."));
-                return false;
+            info.ReplyToCommand("Usage: css_vote <question> [answer1] [answer2] [answer3] ...");
+            return;
         }
 
-        return true;
+        // Voting.StartVote(caller, info);
+    }
+    
+    private static CSSTargetResult? GetTarget(CommandInfo info)
+    {
+        var matches = info.GetArgTargetResult(1);
+
+        if (!matches.Any()) {
+            info.ReplyToCommand(FormatMessage($"Target {info.GetArg(1)} not found."));
+            return null;
+        }
+
+        if (!(matches.Count() > 1) || info.GetArg(1).StartsWith('@')) 
+            return matches;
+        
+        info.ReplyToCommand(FormatMessage($"Multiple targets found for \"{info.GetArg(1)}\"."));
+        
+        return null;
     }
     
     private static string FormatMessage(string message) => $" {ChatColors.Lime}[BasicAdmin]{ChatColors.Default} {message}";

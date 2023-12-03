@@ -3,7 +3,7 @@
 </p>
 
 ## Requirements
-* CSSharp >= v65
+* CSSharp >= v98
 
 ## Configuration
 * **admin_tag**: Tag that's shown in the chat.

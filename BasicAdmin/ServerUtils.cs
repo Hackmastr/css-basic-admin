@@ -1,6 +1,7 @@
 ﻿using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Admin;
+using CounterStrikeSharp.API.Modules.Menu;
 using CounterStrikeSharp.API.Modules.Utils;
 
 namespace BasicAdmin;
@@ -76,6 +77,15 @@ internal static class ServerUtils
         Utilities.GetPlayers().FindAll(FilterPredicates[filter]).ForEach(controller =>
         {
             controller.PrintToChat(message);
+        });
+    }
+    
+    public static void OpenMenuAll(ChatMenu menu)
+    {
+        Utilities.GetPlayers().ForEach(controller =>
+        { 
+            if (controller?.IsValid == true)
+                ChatMenus.OpenMenu(controller, menu);
         });
     }
 }
