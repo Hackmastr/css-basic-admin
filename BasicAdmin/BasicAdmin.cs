@@ -19,7 +19,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 {
     public override string ModuleName => "BasicAdmin";
     public override string ModuleAuthor => "livevilog";
-    public override string ModuleVersion => "1.5.0";
+    public override string ModuleVersion => "1.6.0";
     
     public BasicAdminConfig Config {get; set;} = new ();
     
@@ -164,6 +164,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         
         target?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
+
             ServerUtils.KickPlayer(player.UserId, reason);
             
             if (!Config.HideActivity)
@@ -178,6 +184,11 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
             player.Pawn.Value?.CommitSuicide(false, true);
             
             if (!Config.HideActivity)
@@ -212,6 +223,11 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         var target = GetTarget(info);
         target?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
             if ((int) CsTeam.Spectator == player.TeamNum)
             {
                 info.ReplyToCommand(FormatMessage($"Target {info.GetArg(1)} is a spectator."));
@@ -235,6 +251,11 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         var target = GetTarget(info);
         target?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
             player.ChangeTeam(CsTeam.Spectator);
         
             if (!Config.HideActivity)
@@ -250,6 +271,11 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         var target = GetTarget(info);
         target?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
             player.Respawn();
         
             if (Config.HideActivity)
@@ -349,6 +375,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         
         target?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
+            
             player.Pawn.Value?.Bury();
 
             if (duration > 0)
@@ -366,6 +398,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
+            
             player.Pawn.Value?.Unbury();
         
             if (!Config.HideActivity)
@@ -380,6 +418,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
+            
             player.RemoveWeapons();
             
             if (!Config.HideActivity)
@@ -400,6 +444,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 
         GetTarget(info)?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
+            
             player.Pawn.Value!.Health = health;
         
             if (!Config.HideActivity)
@@ -490,6 +540,11 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 
         GetTarget(info)?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
         
             player.Pawn.Value!.Slap(damage);
         
@@ -513,6 +568,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         
         GetTarget(info)?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
+            
             player.Pawn.Value!.Freeze();
         
             AddTimer(duration, () => player.Pawn.Value!.Unfreeze());
@@ -529,6 +590,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
+            
             player.Pawn.Value!.Unfreeze();
         
             if (!Config.HideActivity)
@@ -543,6 +610,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
+            
             player.Pawn.Value!.ToggleNoclip();
         
             if (!Config.HideActivity)
@@ -557,6 +630,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
+            if (!AdminManager.CanPlayerTarget(caller, player))
+            {
+                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                return;
+            }
+            
             if (!ActiveGodMode.Remove(player.Handle))
             {
                 ActiveGodMode[player.Handle] = true;
@@ -570,7 +649,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     [ConsoleCommand("css_rcon", "Run a server console command.")]
     [CommandHelper(1, "<command>")]
     [RequiresPermissions("@css/rcon")]
-    public void OnRcomCommand(CCSPlayerController? caller, CommandInfo info)
+    public void OnRconCommand(CCSPlayerController? caller, CommandInfo info)
     {
         info.ReplyToCommand($"Command executed ({info.ArgString}).");
         
