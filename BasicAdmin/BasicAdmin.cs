@@ -164,7 +164,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         
         target?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -184,7 +184,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -223,7 +223,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         var target = GetTarget(info);
         target?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -251,7 +251,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         var target = GetTarget(info);
         target?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -271,14 +271,15 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         var target = GetTarget(info);
         target?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
             }
+            
             player.Respawn();
         
-            if (Config.HideActivity)
+            if (!Config.HideActivity)
                 Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} respawned {player.PlayerName}."));
         });
     }
@@ -375,7 +376,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         
         target?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -398,7 +399,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -418,7 +419,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -444,7 +445,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 
         GetTarget(info)?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -540,7 +541,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 
         GetTarget(info)?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -568,7 +569,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         
         GetTarget(info)?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -590,7 +591,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -610,7 +611,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -630,7 +631,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         GetTarget(info)?.Players.ForEach(player =>
         {
-            if (!AdminManager.CanPlayerTarget(caller, player))
+            if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
                 info.ReplyToCommand(FormatMessage("You can't target this player."));
                 return;
@@ -668,7 +669,8 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             return;
         }
 
-        // Voting.StartVote(caller, info);
+        // Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} started a vote \u2029: {ChatColors.Blue}{info.GetArg(1)}"));
+        // new Vote(caller, info).Start();
     }
     
     private static CSSTargetResult? GetTarget(CommandInfo info)
