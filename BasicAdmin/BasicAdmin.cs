@@ -1,4 +1,8 @@
 ﻿using System.Reflection;
+using BasicAdmin.Ents;
+using BasicAdmin.Enums;
+using BasicAdmin.Managers;
+using BasicAdmin.Utils;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes;
@@ -8,22 +12,54 @@ using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Commands;
 using CSSTargetResult = CounterStrikeSharp.API.Modules.Commands.Targeting.TargetResult;
 using CounterStrikeSharp.API.Modules.Cvars;
+using CounterStrikeSharp.API.Modules.Entities;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
+using CounterStrikeSharp.API.Modules.Timers;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
+using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 
 namespace BasicAdmin;
 
-[MinimumApiVersion(98)]
-public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
+[MinimumApiVersion(126)]
+public sealed partial class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 {
     public override string ModuleName => "BasicAdmin";
     public override string ModuleAuthor => "livevilog";
     public override string ModuleVersion => "1.6.0";
     
     public BasicAdminConfig Config {get; set;} = new ();
-    
+
     private static readonly Dictionary<IntPtr, bool> ActiveGodMode = new ();
+    private static readonly Dictionary<IntPtr, HashSet<ActivePunishment>> ActivePunishments = new ();
+    private static readonly HashSet<int> MutedPlayers = new ();
+
+    internal Database _database;
+    private Punishments _punishmentMgr;
+    // private Admins _adminMgr;
+    
+    private Timer _punishmentTimer;
+
+    private async void Init()
+    {
+        try
+        {
+            _database = new Database(this);
+            await _database.Load();
+            _punishmentMgr = new Punishments(this);
+            // _adminMgr = new Admins(this);
+            
+            Server.NextFrame(() =>
+            {
+                _punishmentTimer = AddTimer(60f, PunishmentTimer, TimerFlags.REPEAT);
+            });
+        } catch (Exception e)
+        {
+            Logger.LogError(e, "Error loading database.");
+            Server.NextFrame(() => Server.PrintToConsole(FormatMessage("Error loading database.")));
+        }
+    }
     
     public void OnConfigParsed(BasicAdminConfig config)
     {
@@ -33,10 +69,17 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     public override void Load(bool hotReload)
     {
         base.Load(hotReload);
+
+        Task.Run(Init);
         
         AddCommandListener("say", OnSayCommand);
         AddCommandListener("say_team", OnSayCommand);
+        
         VirtualFunctions.CBaseEntity_TakeDamageOldFunc.Hook(OnTakeDamage, HookMode.Pre);
+        
+        RegisterListener<Listeners.OnClientAuthorized>(OnClientAuthorized);
+        RegisterListener<Listeners.OnClientVoice>(OnClientVoice);
+        RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
     }
 
     public override void Unload(bool hotReload)
@@ -44,6 +87,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         base.Unload(hotReload);
         
         VirtualFunctions.CBaseEntity_TakeDamageOldFunc.Unhook(OnTakeDamage, HookMode.Pre);
+        _punishmentTimer.Kill();
+        
+        Task.Run(async () =>
+        {
+            await _database.Unload();
+        });
     }
 
 
@@ -69,6 +118,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 
     private HookResult OnSayCommand(CCSPlayerController? caller, CommandInfo info)
     {
+        if (caller is not { IsValid: true })
+            return HookResult.Continue;
+        
+        if (ActivePunishments.TryGetValue(caller.Handle, out var punishment) && punishment.Any(x => x.Type == PunishmentType.Gag))
+            return HookResult.Stop;
+        
         if (!(info.GetArg(1).StartsWith('@') && AdminManager.PlayerHasPermissions(caller, "@css/chat")))
             return HookResult.Continue;
 
@@ -80,17 +135,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             message = string.Format(Config.AdminSayTextTeam, caller!.PlayerName,
                 info.GetCommandString[start..^1]);
+            ServerUtils.PrintToChatTeam(TargetFilter.Admin, message);
         }
         else
         {
             message = FormatAdminMessage(string.Format(Config.AdminSayText, caller!.PlayerName,
                 info.GetCommandString[start..^1]));
-        }
-        
-        if (isTeam)
-            ServerUtils.PrintToChatTeam(TargetFilter.Admin, message);
-        else
             Server.PrintToChatAll(message);
+        }
         
         return HookResult.Stop;
     }
@@ -112,11 +164,11 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         
         if (!Server.IsMapValid(map))
         {
-            info.ReplyToCommand(FormatMessage($"Map {map} not found."));
+            info.ReplyToCommand(FormatMessage(Localizer["ba.map_not_found", map]));
             return;
         }
         
-        Server.PrintToChatAll(FormatAdminMessage($"Changing map to {map}..."));
+        Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.changing_map", map]));
         
         AddTimer(3f, () =>
         {
@@ -143,7 +195,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         //     return;
         // }
         
-        Server.PrintToChatAll(FormatAdminMessage($"Changing map to {map}..."));
+        Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.changing_map", map]));
         
         AddTimer(3f, () =>
         {
@@ -166,14 +218,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
 
             ServerUtils.KickPlayer(player.UserId, reason);
             
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} kicked {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer[(reason.Length > 0 ? "ba.target.kicked_reason" : "ba.target.kicked"), caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
 
@@ -186,13 +238,13 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             player.Pawn.Value?.CommitSuicide(false, true);
             
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} slayed {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.slayed", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -211,7 +263,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             player.GiveNamedItem(item);
             
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} gave {player.PlayerName} {ChatColors.Lime}{item}{ChatColors.Default}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.give", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName, item]));
         });
     }
     
@@ -225,12 +277,12 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             if ((int) CsTeam.Spectator == player.TeamNum)
             {
-                info.ReplyToCommand(FormatMessage($"Target {info.GetArg(1)} is a spectator."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.spec"]));
                 return;
             }
      
@@ -239,7 +291,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             player.ChangeTeam(isCs ? CsTeam.Terrorist : CsTeam.CounterTerrorist);
         
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} swapped {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.swapped", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -253,13 +305,13 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             player.ChangeTeam(CsTeam.Spectator);
         
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} moved {player.PlayerName} to spec."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.spec_forced", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -273,14 +325,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             
             player.Respawn();
         
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} respawned {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.respawned", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -335,7 +387,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         if (!int.TryParse(info.GetArg(1), out var time))
         {
-            info.ReplyToCommand(FormatMessage($"Invalid time {info.GetArg(1)}"));
+            info.ReplyToCommand(FormatMessage(Localizer["ba.invalid_value", info.GetArg(1)]));
             return;
         }
 
@@ -343,7 +395,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         timelimit!.SetValue(timelimit.GetPrimitiveValue<float>() + time);
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} extended the map."));
+            Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.extended", caller?.PlayerName ?? Localizer["ba.console"], time]));
     }
     
     [ConsoleCommand("css_rr", "Restart game.")]
@@ -354,9 +406,9 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         Server.ExecuteCommand("mp_restartgame 1");
         
         if (!Config.HideActivity)
-            Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} restarted the game."));
+            Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.rr", caller?.PlayerName ?? Localizer["ba.console"]]));
         
-        Logger.LogInformation($"{caller!.PlayerName} restarted the game.");
+        Logger.LogInformation($"{caller?.PlayerName ?? Localizer["ba.console"]} restarted the game.");
     }
     
     [ConsoleCommand("css_bury", "Bury a player.")]
@@ -370,7 +422,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         
         if (!string.IsNullOrEmpty(info.GetArg(2)) && !int.TryParse(info.GetArg(2), out duration))
         {
-            info.ReplyToCommand(FormatMessage($"Invalid duration value."));
+            info.ReplyToCommand(FormatMessage(Localizer["ba.invalid_value", info.GetArg(2)]));
             return;
         }
         
@@ -378,7 +430,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             
@@ -388,7 +440,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
                 AddTimer(duration, () => player.Pawn.Value?.Unbury());
         
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller?.PlayerName} buried {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.buried", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -401,14 +453,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             
             player.Pawn.Value?.Unbury();
         
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} unburied {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.unburied", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -421,14 +473,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             
             player.RemoveWeapons();
             
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} disarmed {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.disarmed", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -439,7 +491,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         if (!int.TryParse(info.GetArg(2), out var health))
         {
-            info.ReplyToCommand(FormatMessage($"Invalid health value."));
+            info.ReplyToCommand(FormatMessage(Localizer["ba.invalid_value", info.GetArg(2)]));
             return;
         }
 
@@ -447,14 +499,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             
             player.Pawn.Value!.Health = health;
         
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} changed {player.PlayerName}'s health to {health}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.hp", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName, health]));
         });
     }
     
@@ -467,13 +519,13 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
 
         if (cvar == null)
         {
-            info.ReplyToCommand(FormatMessage($"Cvar \"{info.GetArg(1)}\" not found."));
+            info.ReplyToCommand(FormatMessage(Localizer["ba.cvar_not_found", info.GetArg(1)]));
             return;
         }
 
         if (cvar.Name.Equals("sv_cheats") && !AdminManager.PlayerHasPermissions(caller, "@css/cheats"))
         {
-            info.ReplyToCommand(FormatMessage($"You don't have permissions to change \"{info.GetArg(1)}\"."));
+            info.ReplyToCommand(FormatMessage(Localizer["ba.cvar_permission_denied", cvar.Name]));
             return;
         }
 
@@ -491,7 +543,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         if (!string.IsNullOrEmpty(Config.AdminListReqFlag) && !AdminManager.PlayerHasPermissions(caller, Config.AdminListReqFlag))
         {
-            info.ReplyToCommand("[CSS] You don't have permissions to use this command.");
+            info.ReplyToCommand(FormatAdminMessage(Localizer["ba.permission_denied"]));
             return;
         }
         
@@ -511,7 +563,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
     {
         if (!string.IsNullOrEmpty(Config.AdminListReqFlag) && !AdminManager.PlayerHasPermissions(caller, Config.AdminListReqFlag))
         {
-            info.ReplyToCommand("[CSS] You don't have permissions to use this command.");
+            info.ReplyToCommand(FormatMessage(Localizer["ba.permission_denied"]));
             return;
         }
         
@@ -535,7 +587,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         
         if (!string.IsNullOrEmpty(info.GetArg(2)) && !int.TryParse(info.GetArg(2), out damage))
         {
-            info.ReplyToCommand(FormatMessage($"Invalid damage value."));
+            info.ReplyToCommand(FormatMessage(Localizer["ba.invalid_value", info.GetArg(2)]));
             return;
         }
 
@@ -543,14 +595,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
         
             player.Pawn.Value!.Slap(damage);
         
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} slapped {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.slapped", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName, damage]));
         });
     }
     
@@ -563,7 +615,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         
         if (!string.IsNullOrEmpty(info.GetArg(2)) && !int.TryParse(info.GetArg(2), out duration))
         {
-            info.ReplyToCommand(FormatMessage($"Invalid duration value."));
+            info.ReplyToCommand(FormatMessage(Localizer["ba.invalid_value", info.GetArg(2)]));
             return;
         }
         
@@ -571,7 +623,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             
@@ -580,7 +632,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             AddTimer(duration, () => player.Pawn.Value!.Unfreeze());
         
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} froze {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.frozen", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -593,14 +645,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             
             player.Pawn.Value!.Unfreeze();
         
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} unfroze {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.unfroze", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -613,14 +665,14 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             
             player.Pawn.Value!.ToggleNoclip();
         
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} toggled noclip on {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.noclip", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -633,7 +685,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         {
             if (!player.IsBot && !AdminManager.CanPlayerTarget(caller, player))
             {
-                info.ReplyToCommand(FormatMessage("You can't target this player."));
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.immunity"]));
                 return;
             }
             
@@ -643,7 +695,7 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
             }
 
             if (!Config.HideActivity)
-                Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} toggled godmode on {player.PlayerName}."));
+                Server.PrintToChatAll(FormatAdminMessage(Localizer["ba.target.godmode", caller?.PlayerName ?? Localizer["ba.console"], player.PlayerName]));
         });
     }
     
@@ -670,26 +722,92 @@ public sealed class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminConfig>
         }
 
         // Server.PrintToChatAll(FormatAdminMessage($"{caller!.PlayerName} started a vote \u2029: {ChatColors.Blue}{info.GetArg(1)}"));
-        // new Vote(caller, info).Start();
+        //
+        // new Vote(this, info).OnEnd((VoteResult result) =>
+        // {
+        //     Server.PrintToChatAll(FormatAdminMessage($"Vote ended. \u2029: {ChatColors.Blue}{info.GetArg(1)}"));
+        //     Server.PrintToChatAll(FormatAdminMessage($"Results: \u2029: {ChatColors.Blue}{result}"));
+        // });
     }
-    
-    private static CSSTargetResult? GetTarget(CommandInfo info)
+
+    // [ConsoleCommand("css_addadmin", "Add an admin.")]
+    // [CommandHelper(1, "<target or steamid> <name>")]
+    // [RequiresPermissions("@css/root")]
+    // public void OnAddAdminCommand(CCSPlayerController? caller, CommandInfo info)
+    // {
+    //     var target = GetTarget(info, false)?.Players.First();
+    //     
+    //     var name = target is null ? info.GetArg(1) : target.PlayerName;
+    //     var steamId = target?.AuthorizedSteamID?.SteamId64 is null ? new SteamID(info.GetArg(1)) : target.AuthorizedSteamID;
+    //     
+    //     if (target?.IsBot is true)
+    //     {
+    //         info.ReplyToCommand(FormatMessage("You can't target a bot."));
+    //         return;
+    //     }
+    //
+    //     Task.Run(async () =>
+    //     {
+    //         if (await _adminMgr.LoadAdmin(steamId))
+    //         {
+    //             info.ReplyToCommand(FormatMessage("Target is already an admin."));
+    //             return;
+    //         }
+    //     
+    //         var res = await _adminMgr.AddAdmin(steamId, name);
+    //     
+    //         if (!res)
+    //         {
+    //             Logger.LogError($"Error adding admin {steamId}.");
+    //             return;
+    //         }
+    //     
+    //         Server.NextFrame(() =>
+    //         {
+    //             info.ReplyToCommand($"{name} added.");
+    //         });
+    //     });
+    // }
+
+    [ConsoleCommand("css_comms", "Get active punishments.")]
+    [CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
+    public void OnCommsCommand(CCSPlayerController? caller, CommandInfo info)
+    {
+        if (caller is not { IsValid: true })
+            return;
+
+        if (!ActivePunishments.TryGetValue(caller.Handle, out var punishments) || punishments.Count == 0)
+        {
+            info.ReplyToCommand(FormatAdminMessage(Localizer["ba.comms.none"]));
+            return;
+        }
+
+        var message = punishments.Aggregate($"{Localizer["ba.comms_phrase"]}\u2029", 
+            (current, punishment) => 
+                current + $"{Localizer["ba.comms", punishment.Type.ToString(), punishment.ExpiresAt]}\u2029");
+        
+        info.ReplyToCommand(FormatAdminMessage(message));
+    }
+
+    private CSSTargetResult? GetTarget(CommandInfo info, bool allowMultiple = true, bool noError = false)
     {
         var matches = info.GetArgTargetResult(1);
 
         if (!matches.Any()) {
-            info.ReplyToCommand(FormatMessage($"Target {info.GetArg(1)} not found."));
+            if (!noError)
+                info.ReplyToCommand(FormatMessage(Localizer["ba.target.not_found", info.GetArg(1)]));
             return null;
         }
 
-        if (!(matches.Count() > 1) || info.GetArg(1).StartsWith('@')) 
+        if (!(matches.Count() > 1) || (info.GetArg(1).StartsWith('@') && allowMultiple)) 
             return matches;
         
-        info.ReplyToCommand(FormatMessage($"Multiple targets found for \"{info.GetArg(1)}\"."));
+        if (!noError)
+            info.ReplyToCommand(FormatMessage(Localizer["ba.target.multiple", info.GetArg(1)]));
         
         return null;
     }
     
-    private static string FormatMessage(string message) => $" {ChatColors.Lime}[BasicAdmin]{ChatColors.Default} {message}";
+    internal static string FormatMessage(string message) => $" {ChatColors.Lime}[BasicAdmin]{ChatColors.Default} {message}";
     private string FormatAdminMessage(string message) => $" {Config.AdminTag} {message}";
 }

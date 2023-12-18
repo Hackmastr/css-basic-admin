@@ -1,4 +1,4 @@
-﻿namespace BasicAdmin;
+﻿namespace BasicAdmin.Enums;
 
 internal enum TargetResult
 {

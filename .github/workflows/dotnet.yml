@@ -39,7 +39,7 @@ jobs:
           mkdir -p addons/counterstrikesharp/plugins/${{env.PLUGIN_NAME}}
           mv BasicAdmin/bin/Debug/net7.0/publish/* addons/counterstrikesharp/plugins/${{env.PLUGIN_NAME}}
           cd addons/counterstrikesharp/plugins/${{env.PLUGIN_NAME}}
-          rm CounterStrikeSharp.API.dll McMaster.NETCore.Plugins.dll Microsoft.DotNet.PlatformAbstractions.dll Microsoft.Extensions.DependencyModel.dll ${{env.PLUGIN_NAME}}.pdb
+          find . -maxdepth 1 ! -name 'BasicAdmin.dll' ! -name 'MySqlConnector.dll' ! -name 'schema.sql' ! -name '.' -type f,d -exec rm -rf {} +
 
       - uses: actions/upload-artifact@v3
         with:
