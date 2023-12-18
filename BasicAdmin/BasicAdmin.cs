@@ -12,11 +12,9 @@ using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Commands;
 using CSSTargetResult = CounterStrikeSharp.API.Modules.Commands.Targeting.TargetResult;
 using CounterStrikeSharp.API.Modules.Cvars;
-using CounterStrikeSharp.API.Modules.Entities;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
 using CounterStrikeSharp.API.Modules.Timers;
-using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 
@@ -27,7 +25,7 @@ public sealed partial class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminCon
 {
     public override string ModuleName => "BasicAdmin";
     public override string ModuleAuthor => "livevilog";
-    public override string ModuleVersion => "1.6.0";
+    public override string ModuleVersion => "1.7.0";
     
     public BasicAdminConfig Config {get; set;} = new ();
 
