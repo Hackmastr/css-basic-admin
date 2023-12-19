@@ -89,8 +89,7 @@ BEGIN
 
     UPDATE {prefix}punishments
     SET length = IF(length - 1 = 0, -1, length - 1)
-    WHERE expires_at > NOW()
-      AND expires_at <= NOW() + INTERVAL 1 MINUTE;
+    WHERE expires_at > NOW();
 
 END;
 
