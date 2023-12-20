@@ -39,7 +39,7 @@ jobs:
           mkdir -p addons/counterstrikesharp/plugins/${{env.PLUGIN_NAME}}
           mv BasicAdmin/bin/Debug/net7.0/publish/* addons/counterstrikesharp/plugins/${{env.PLUGIN_NAME}}
           cd addons/counterstrikesharp/plugins/${{env.PLUGIN_NAME}}
-          find . -maxdepth 1 ! -name 'BasicAdmin.dll' ! -name 'MySqlConnector.dll' ! -name 'schema.sql' ! -name '.' -type f,d -exec rm -rf {} +
+          find . -maxdepth 1 ! -name 'BasicAdmin.dll' ! -name 'MySqlConnector.dll' ! -name 'schema.sql' ! -name 'lang' ! -name '.' -type f,d -exec rm -rf {} +
 
       - uses: actions/upload-artifact@v3
         with:
