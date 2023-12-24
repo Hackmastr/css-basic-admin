@@ -103,7 +103,7 @@ public sealed partial class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminCon
 
         var pawn = Utilities.GetEntityFromIndex<CCSPlayerPawn>((int)entindex);
         
-        if (pawn.OriginalController.Value is not { } player)
+        if (pawn?.OriginalController?.Value is not { } player)
             return HookResult.Continue;
         
         if (ActiveGodMode.ContainsKey(player.Handle))
