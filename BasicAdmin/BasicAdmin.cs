@@ -174,7 +174,7 @@ public sealed partial class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminCon
             // caller.Discon
         });
         
-        Logger.LogInformation($"{caller!.PlayerName} changed map to {map}.");
+        Logger.LogInformation($"{caller?.PlayerName ?? Localizer["ba.console"]} changed map to {map}.");
     }
     
     [ConsoleCommand("css_wsmap", "Change map.")]
@@ -200,7 +200,7 @@ public sealed partial class BasicAdmin : BasePlugin, IPluginConfig<BasicAdminCon
             Server.ExecuteCommand(command);
         });
         
-        Logger.LogInformation($"{caller!.PlayerName} changed map to {map}.");
+        Logger.LogInformation($"{caller?.PlayerName ?? Localizer["ba.console"]} changed map to {map}.");
     }
     
     [ConsoleCommand("css_kick", "Kick a player from the server.")]
