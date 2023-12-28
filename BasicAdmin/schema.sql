@@ -5,6 +5,7 @@
     nick       varchar(255)                         not null,
     steamid64  bigint                               not null,
     immunity   int      default 0                   null,
+    server_id   int unsigned	default null        null,
     created_at datetime default current_timestamp() null,
     updated_at datetime default current_timestamp() null on update current_timestamp(),
     constraint steamid64
@@ -93,7 +94,7 @@ BEGIN
 
 END;
 
-create definer = root@`%` event expire_basic_admin_punishs_event on schedule
+create event expire_basic_admin_punishs_event on schedule
     every '1' MINUTE
         starts '2023-12-14 22:00:06'
     enable
