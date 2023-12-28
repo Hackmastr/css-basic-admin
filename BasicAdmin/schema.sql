@@ -5,6 +5,7 @@
     nick       varchar(255)                         not null,
     steamid64  bigint                               not null,
     immunity   int      default 0                   null,
+    server_id   int unsigned	default null        null,
     created_at datetime default current_timestamp() null,
     updated_at datetime default current_timestamp() null on update current_timestamp(),
     constraint steamid64
