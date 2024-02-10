@@ -1,8 +1,8 @@
 ﻿using System.Text.Json.Serialization;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Utils;
+using DatabaseAdmins.Backends;
 
-namespace BasicAdmin;
+namespace BasicAdmin.Config;
 
 public class PunishmentDefaults
 {
@@ -81,7 +81,13 @@ public class BasicAdminConfig : BasePluginConfig
     /// Database config.
     /// </summary>
     [JsonPropertyName("database")]
-    public BasicAdminDatabaseConfig Database { get; set; } = new BasicAdminDatabaseConfig();
+    public BasicAdminDatabaseConfig Database { get; set; } = new();
+    
+    /// <summary>
+    /// Backend to use.
+    /// </summary>
+    [JsonPropertyName("backend")]
+    public BackendType Backend { get; set; } = BackendType.MySql;
     
     [JsonPropertyName("punishments")]
     public BasicAdminPunishmentsConfig Punishments { get; set; } = new ();

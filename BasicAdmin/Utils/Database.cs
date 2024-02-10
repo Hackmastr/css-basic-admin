@@ -20,6 +20,9 @@ internal sealed class Database
     
     public async Task Load()
     {
+        if (_conn.State == ConnectionState.Open)
+            return;
+        
         await _conn.OpenAsync();
 
         if (_conn.State != ConnectionState.Open)
@@ -33,6 +36,9 @@ internal sealed class Database
     
     public async Task Unload()
     {
+        if (_conn.State == ConnectionState.Closed)
+            return;
+        
         await _conn.CloseAsync();
         
         if (_conn.State != ConnectionState.Closed)
@@ -50,7 +56,8 @@ internal sealed class Database
     private async void CreateTablesIfNotExists()
     {
         await using var command = new MySqlCommand(
-            $"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '{_prefix}punishments'", _conn);
+            $"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = @tableName", _conn);
+        command.Parameters.AddWithValue("@tableName", $"{_prefix}punishments");
 
         if (Convert.ToInt32(command.ExecuteScalar()) > 0)
             return;

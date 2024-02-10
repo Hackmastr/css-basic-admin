@@ -16,7 +16,7 @@ public sealed class Admins
     public Admins(BasicAdmin context)
     {
         _context = context;
-        _conn = context._database.GetConnection();
+        _conn = context.Database.GetConnection();
         _prefix = context.Config.Database.TablePrefix;
     }
 

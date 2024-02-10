@@ -10,36 +10,10 @@ namespace BasicAdmin;
 
 partial class BasicAdmin
 {
-    private void OnClientAuthorized(int slot, SteamID id)
-    {
-        Task.Run(async () =>
-        {
-            if (!id.IsValid()) 
-                return;
-            
-            // await _adminMgr.LoadAdmin(id);
-            await KickPlayerIfBanned(slot, id);
-            await FetchActivePunishments(slot, id);
-        });
-    }
-    
-    private void  OnClientVoice(int slot)
-    {
-        if (MutedPlayers.Contains(slot))
-            Utilities.GetPlayerFromSlot(slot).VoiceFlags = VoiceFlags.Muted;
-    }
-    
-    private HookResult OnPlayerDisconnect(EventPlayerDisconnect ev, GameEventInfo info)
-    {
-        var sid = ev.Userid.Handle;
-        
-        ActivePunishments.Remove(sid);
-
-        return HookResult.Continue;
-    }
-
     private void PunishmentTimer()
     {
+        _punishmentMgr.ExpirePunishments();
+        
         foreach (var (handle, punishments) in ActivePunishments)
         {
             foreach (var punishment in punishments)
@@ -89,19 +63,22 @@ partial class BasicAdmin
         });
     }
 
-    private Task KickPlayerIfBanned(int slot, SteamID id)
+    private Task<bool> KickPlayerIfBanned(int slot, SteamID id)
     {
         return Task.Run(async () =>
         {
             var isBanned = await _punishmentMgr.HasActivePunishment(id, PunishmentType.Ban);
             if (!isBanned)
-                return;
-            
+                return false;
+
             Server.NextFrame(() =>
             {
                 var playerId = Utilities.GetPlayerFromSlot(slot).UserId;
+                
                 ServerUtils.KickPlayer(playerId, Localizer["ba.punishments.defaults.ban"]);
             });
+            
+            return true;
         });
     }
 

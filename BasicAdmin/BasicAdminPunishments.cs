@@ -5,8 +5,8 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Commands;
-using CounterStrikeSharp.API.Modules.Entities;
 using Microsoft.Extensions.Logging;
+using static CounterStrikeSharp.API.Modules.Entities.SteamID;
 
 namespace BasicAdmin;
 
@@ -33,7 +33,7 @@ partial class BasicAdmin
         var playerName = player?.PlayerName ?? "-";
         var playerId = player?.AuthorizedSteamID;
         
-        if (playerId is null && (!SteamID.TryParse(info.GetArg(1), out playerId)))
+        if (playerId is null && (!TryParse(info.GetArg(1), out playerId)))
         {
             info.ReplyToCommand(FormatMessage(Localizer["ba.punishments.target.authorized_steam_id_invalid", info.GetArg(1)]));
             return;
@@ -93,8 +93,11 @@ partial class BasicAdmin
         var adminId = caller?.AuthorizedSteamID ?? null;
         var playerName = player?.PlayerName ?? "-";
         var playerId = player?.AuthorizedSteamID;
-        
-        if (playerId is null && !SteamID.TryParse(info.GetArg(1), out playerId))
+
+        if (playerId is null)
+            TryParse(info.GetArg(1), out playerId);
+
+        if (playerId is null)
         {
             info.ReplyToCommand(FormatMessage(Localizer["ba.punishments.target.authorized_steam_id_invalid", info.GetArg(1)]));
             return;
@@ -102,7 +105,7 @@ partial class BasicAdmin
         
         Task.Run(async () =>
         {
-            if (await IsAlreadyPunished(info, playerId!, playerName, PunishmentType.Gag)) return;
+            if (await IsAlreadyPunished(info, playerId, playerName, PunishmentType.Gag)) return;
 
             var res = await _punishmentMgr.Gag(adminId, playerId, playerName, duration, message);
             
@@ -167,7 +170,10 @@ partial class BasicAdmin
         var playerName = player?.PlayerName ?? "-";
         var playerId = player?.AuthorizedSteamID;
         
-        if (playerId is null && !SteamID.TryParse(info.GetArg(1), out playerId))
+        if (playerId is null)
+            TryParse(info.GetArg(1), out playerId);
+
+        if (playerId is null)
         {
             info.ReplyToCommand(FormatMessage(Localizer["ba.punishments.target.authorized_steam_id_invalid", info.GetArg(1)]));
             return;
@@ -175,7 +181,7 @@ partial class BasicAdmin
         
         Task.Run(async () =>
         {
-            if (await IsAlreadyPunished(info, playerId!, playerName, PunishmentType.Mute)) return;
+            if (await IsAlreadyPunished(info, playerId, playerName, PunishmentType.Mute)) return;
 
             var res = await _punishmentMgr.Mute(adminId, playerId, playerName, duration, message);
             
@@ -231,7 +237,10 @@ partial class BasicAdmin
         
         var playerId = player?.AuthorizedSteamID;
         
-        if (playerId is null && !SteamID.TryParse(info.GetArg(1), out playerId))
+        if (playerId is null)
+            TryParse(info.GetArg(1), out playerId);
+
+        if (playerId is null)
         {
             info.ReplyToCommand(FormatMessage(Localizer["ba.punishments.target.authorized_steam_id_invalid", info.GetArg(1)]));
             return;
@@ -276,7 +285,10 @@ partial class BasicAdmin
         
         var playerId = player?.AuthorizedSteamID;
         
-        if (playerId is null && !SteamID.TryParse(info.GetArg(1), out playerId))
+        if (playerId is null)
+            TryParse(info.GetArg(1), out playerId);
+
+        if (playerId is null)
         {
             info.ReplyToCommand(FormatMessage(Localizer["ba.punishments.target.authorized_steam_id_invalid", info.GetArg(1)]));
             return;
@@ -327,13 +339,15 @@ partial class BasicAdmin
         var adminId = caller?.AuthorizedSteamID?.SteamId64 ?? 0;
         
         var playerId = player?.AuthorizedSteamID;
-        
-        if (playerId is null && !SteamID.TryParse(info.GetArg(1), out playerId))
+
+        if (playerId is null)
+            TryParse(info.GetArg(1), out playerId);
+
+        if (playerId is null)
         {
             info.ReplyToCommand(FormatMessage(Localizer["ba.punishments.target.authorized_steam_id_invalid", info.GetArg(1)]));
             return;
         }
-        
         Task.Run(async () =>
         {
             var res = await _punishmentMgr.Unmute(playerId);

@@ -1,5 +1,6 @@
 ﻿using BasicAdmin.Ents;
 using BasicAdmin.Enums;
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Entities;
 using Microsoft.Extensions.Logging;
 using MySqlConnector;
@@ -14,7 +15,7 @@ internal sealed class Punishments
     
     public Punishments(BasicAdmin context)
     {
-        _conn = context._database.GetConnection();
+        _conn = context.Database.GetConnection();
         _context = context;
         _prefix = context.Config.Database.TablePrefix;
     }
@@ -121,7 +122,7 @@ internal sealed class Punishments
 
         try
         {
-            var res = await cmd.ExecuteNonQueryAsync();
+            await cmd.ExecuteNonQueryAsync();
         } catch (Exception e)
         {
             _context.Logger.LogError(e, $"Failed to add punishment for {targetName} ({target.SteamId64})");
@@ -149,5 +150,19 @@ internal sealed class Punishments
         }
 
         return false;
+    }
+
+    public async void ExpirePunishments()
+    {
+        try
+        {
+            await using var cmd = new MySqlCommand("ExpireBans", _conn);
+            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex)
+        {
+            _context.Logger.LogError(ex, "Failed to expire punishments");
+        }
     }
 }
